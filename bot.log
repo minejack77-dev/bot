@@ -1,0 +1,39 @@
+2025-09-16 15:23:56,523 | INFO | bot | Bot starting...
+2025-09-16 15:23:56,523 | INFO | aiogram.dispatcher | Start polling
+2025-09-16 15:23:56,805 | INFO | aiogram.dispatcher | Run polling for bot @linguodidactics_helper_bot id=7589717601 - 'DemoBot'
+2025-09-16 15:24:00,940 | ERROR | aiogram.dispatcher | Failed to fetch updates - TelegramConflictError: Telegram server says - Conflict: terminated by other getUpdates request; make sure that only one bot instance is running
+2025-09-16 15:24:00,940 | WARNING | aiogram.dispatcher | Sleep for 1.000000 seconds and try again... (tryings = 0, bot id = 7589717601)
+2025-09-16 15:24:06,490 | ERROR | aiogram.dispatcher | Failed to fetch updates - TelegramConflictError: Telegram server says - Conflict: terminated by other getUpdates request; make sure that only one bot instance is running
+2025-09-16 15:24:06,491 | WARNING | aiogram.dispatcher | Sleep for 1.168714 seconds and try again... (tryings = 1, bot id = 7589717601)
+2025-09-16 15:24:11,814 | ERROR | aiogram.dispatcher | Failed to fetch updates - TelegramConflictError: Telegram server says - Conflict: terminated by other getUpdates request; make sure that only one bot instance is running
+2025-09-16 15:24:11,815 | WARNING | aiogram.dispatcher | Sleep for 1.616656 seconds and try again... (tryings = 2, bot id = 7589717601)
+2025-09-16 15:24:14,232 | INFO | aiogram.dispatcher | Connection established (tryings = 3, bot id = 7589717601)
+2025-09-16 15:24:14,233 | INFO | aiogram.event | Update id=78415608 is not handled. Duration 0 ms by bot id=7589717601
+2025-09-16 15:24:17,711 | ERROR | aiogram.dispatcher | Failed to fetch updates - TelegramConflictError: Telegram server says - Conflict: terminated by other getUpdates request; make sure that only one bot instance is running
+2025-09-16 15:24:17,711 | WARNING | aiogram.dispatcher | Sleep for 1.000000 seconds and try again... (tryings = 0, bot id = 7589717601)
+2025-09-16 15:24:19,385 | INFO | aiogram.dispatcher | Connection established (tryings = 1, bot id = 7589717601)
+2025-09-16 15:24:19,385 | INFO | aiogram.event | Update id=78415609 is not handled. Duration 0 ms by bot id=7589717601
+2025-09-16 15:24:20,166 | INFO | aiogram.event | Update id=78415610 is not handled. Duration 0 ms by bot id=7589717601
+2025-09-16 15:24:22,671 | INFO | aiogram.event | Update id=78415611 is not handled. Duration 0 ms by bot id=7589717601
+2025-09-16 15:24:24,306 | ERROR | aiogram.dispatcher | Failed to fetch updates - TelegramConflictError: Telegram server says - Conflict: terminated by other getUpdates request; make sure that only one bot instance is running
+2025-09-16 15:24:24,306 | WARNING | aiogram.dispatcher | Sleep for 1.000000 seconds and try again... (tryings = 0, bot id = 7589717601)
+2025-09-16 15:24:29,814 | ERROR | aiogram.dispatcher | Failed to fetch updates - TelegramConflictError: Telegram server says - Conflict: terminated by other getUpdates request; make sure that only one bot instance is running
+2025-09-16 15:24:29,814 | WARNING | aiogram.dispatcher | Sleep for 1.414964 seconds and try again... (tryings = 1, bot id = 7589717601)
+2025-09-16 15:24:40,360 | INFO | bot | Bot starting...
+2025-09-16 15:24:40,360 | INFO | aiogram.dispatcher | Start polling
+2025-09-16 15:24:40,614 | INFO | aiogram.dispatcher | Run polling for bot @linguodidactics_helper_bot id=7589717601 - 'DemoBot'
+2025-09-16 15:24:42,030 | INFO | aiogram.event | Update id=78415612 is not handled. Duration 0 ms by bot id=7589717601
+2025-09-16 15:24:47,144 | INFO | aiogram.event | Update id=78415613 is not handled. Duration 0 ms by bot id=7589717601
+2025-09-16 15:24:54,007 | INFO | aiogram.event | Update id=78415614 is not handled. Duration 0 ms by bot id=7589717601
+2025-09-16 15:24:55,766 | INFO | aiogram.event | Update id=78415615 is not handled. Duration 0 ms by bot id=7589717601
+2025-09-16 15:24:58,816 | INFO | aiogram.event | Update id=78415616 is not handled. Duration 0 ms by bot id=7589717601
+2025-09-16 15:35:30,133 | INFO | aiogram.dispatcher | Start polling
+2025-09-16 15:35:30,383 | INFO | aiogram.dispatcher | Run polling for bot @linguodidactics_helper_bot id=7589717601 - 'DemoBot'
+2025-09-16 15:35:40,354 | INFO | aiogram.event | Update id=78415625 is handled. Duration 233 ms by bot id=7589717601
+2025-09-16 15:35:43,981 | INFO | aiogram.event | Update id=78415626 is handled. Duration 147 ms by bot id=7589717601
+2025-09-16 15:35:44,900 | INFO | aiogram.event | Update id=78415627 is handled. Duration 181 ms by bot id=7589717601
+2025-09-16 15:35:45,806 | INFO | aiogram.event | Update id=78415628 is handled. Duration 135 ms by bot id=7589717601
+2025-09-16 15:35:46,688 | INFO | aiogram.event | Update id=78415629 is handled. Duration 87 ms by bot id=7589717601
+2025-09-16 15:35:47,430 | INFO | aiogram.event | Update id=78415630 is handled. Duration 85 ms by bot id=7589717601
+2025-09-16 15:35:48,907 | INFO | aiogram.event | Update id=78415631 is handled. Duration 131 ms by bot id=7589717601
+2025-09-16 15:35:49,718 | INFO | aiogram.event | Update id=78415632 is handled. Duration 78 ms by bot id=7589717601
