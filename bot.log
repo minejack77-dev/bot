@@ -37,3 +37,9 @@
 2025-09-16 15:35:47,430 | INFO | aiogram.event | Update id=78415630 is handled. Duration 85 ms by bot id=7589717601
 2025-09-16 15:35:48,907 | INFO | aiogram.event | Update id=78415631 is handled. Duration 131 ms by bot id=7589717601
 2025-09-16 15:35:49,718 | INFO | aiogram.event | Update id=78415632 is handled. Duration 78 ms by bot id=7589717601
+2025-09-16 22:40:34,281 | INFO | aiogram.dispatcher | Start polling
+2025-09-16 22:40:34,540 | INFO | aiogram.dispatcher | Run polling for bot @linguodidactics_helper_bot id=7589717601 - 'DemoBot'
+2025-09-16 22:40:52,403 | INFO | aiogram.dispatcher | Polling stopped
+2025-09-16 22:40:52,403 | ERROR | aiogram.dispatcher | Failed to fetch updates - TelegramNetworkError: HTTP Client says - ServerDisconnectedError: Server disconnected
+2025-09-16 22:40:52,404 | WARNING | aiogram.dispatcher | Sleep for 1.000000 seconds and try again... (tryings = 0, bot id = 7589717601)
+2025-09-16 22:40:52,655 | INFO | aiogram.dispatcher | Polling stopped for bot @linguodidactics_helper_bot id=7589717601 - 'DemoBot'
