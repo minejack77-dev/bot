@@ -18,7 +18,7 @@ BOT_TOKEN = getenv("BOT_TOKEN")
 # --- базовая настройка логов (оставлено как у тебя) ---
 logging.basicConfig(level=logging.INFO)
 
-# --- + файл-лог с ротацией (добавлено) ---
+# --- + файл-лог с ротацией (добавлено) ---hjjlkhnjklhjklhjklh
 LOG_FILE = "bot.log"
 _file_handler = RotatingFileHandler(LOG_FILE, maxBytes=2_000_000, backupCount=5, encoding="utf-8")
 _file_handler.setFormatter(logging.Formatter("%(asctime)s | %(levelname)s | %(name)s | %(message)s"))
