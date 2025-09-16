@@ -14,6 +14,7 @@ from db_utils import init_db, log_user_action  # ← добавлено
 
 load_dotenv()
 BOT_TOKEN = getenv("BOT_TOKEN")
+FEEDBACK_WAITING: set[int] = set()
 
 # --- базовая настройка логов (оставлено как у тебя) ---
 logging.basicConfig(level=logging.INFO)
@@ -56,11 +57,46 @@ dp.message.middleware(DBLoggerMiddleware())
 formulator = CreateTaskFormulation()
 
 # --- быстрые клавиатуры ---
+
+async def answer_with_keyboard(message, result: dict):
+    """
+    Универсальный ответчик:
+    - если есть options -> рисуем клавиатуру с кнопками
+    - если action == 'done' -> показываем финал и кнопки навигации
+    - иначе просто отправляем текст
+    """
+    if not result:
+        return
+
+    # Финальный шаг
+    if result.get("action") == "done":
+        kb = ReplyKeyboardMarkup(
+            resize_keyboard=True,
+            keyboard=[
+                [KeyboardButton(text="Back to sections")],
+                [KeyboardButton(text="Back to main menu")],
+            ],
+        )
+        await message.answer(result["text"], reply_markup=kb)
+        return
+
+    # Вопрос с вариантами
+    if "options" in result and isinstance(result["options"], (list, tuple)):
+        rows = [[KeyboardButton(text=opt)] for opt in result["options"]]
+        kb = ReplyKeyboardMarkup(resize_keyboard=True, keyboard=rows)
+        await message.answer(result["text"], reply_markup=kb)
+        return
+
+    # Простой текст
+    await message.answer(result.get("text", ""))
+
 def main_menu_kb():
     return ReplyKeyboardMarkup(
         resize_keyboard=True,
         keyboard=[
             [KeyboardButton(text="Create task formulation")],
+            [KeyboardButton(text="Practice task formulation")],
+            [KeyboardButton(text="Feedback")],
             [KeyboardButton(text="Help")]
         ]
     )
@@ -113,9 +149,35 @@ def reading_menu_kb():
     )
 
 BOT_DESCRIPTION = (
-    "Welcome! This bot helps generate clear English task formulations.\n\n"
-    "Tap 'Create task formulation' to start, pick a section, then answer a few prompts. "
-    "You'll get a ready-to-use instruction."
+    "Welcome to the Task Formulation Bot!\n\n"
+    "This bot helps English teachers and learners to quickly generate, practice, and manage various types of language tasks for lessons and self-study.\n\n"
+    "Main Features:\n"
+    "1. Create Task Formulation\n"
+    "   - Instantly generate clear and professional instructions for a wide variety of English tasks.\n"
+    "   - Supported task types include:\n"
+    "     • Vocabulary (labelling, categorisation, word-building, matching, odd one out, synonyms/antonyms/definitions/lexical sets)\n"
+    "     • Grammar (multiple choice, sentence/dialogue completion, transformation, error correction)\n"
+    "     • Reading (multiple choice questions)\n"
+    "   - The bot will guide you step by step, asking for all necessary parameters and helping you choose the right task format.\n\n"
+    "2. Practice Task Formulation (CURRENTLY UNAVAILABLE!!!)\n"
+    "   - Practice formulating instructions for different types of tasks.\n"
+    "   - The bot will show you a task body (e.g., a picture or text) and you will try to write the correct instruction.\n"
+    "   - After your attempt, you can check the correct answer and compare it with your own.\n\n"
+    "3. Feedback\n"
+    "   - You can send any feedback, suggestions, or questions to the developer at any time using the 'Feedback' button in the main menu.\n\n"
+    "4. Help\n"
+    "   - At any time, press the 'Help' button to see this description and get guidance on how to use the bot.\n\n"
+    "How to use:\n"
+    "- Use the main menu to select what you want to do: create a task, practice, get help, or send feedback.\n"
+    "- Follow the on-screen instructions and choose options using the provided buttons.\n"
+    "- For each task type, the bot will ask you a series of questions to clarify the details and then generate a ready-to-use instruction.\n"
+    "- In practice mode, try to formulate the instruction yourself and check your answer.\n\n"
+    "Who is this bot for?\n"
+    "- English teachers who want to save time and get high-quality task instructions.\n"
+    "- Students who want to practice understanding and formulating task instructions.\n"
+    "- Anyone interested in English language learning and teaching.\n\n"
+    "Your actions in the bot are logged for quality improvement and support. All feedback is welcome!\n\n"
+    "If you have any questions, just press 'Help' or 'Feedback'. Enjoy using the bot!"
 )
 
 # ---------- утилита отправки ответа ----------
@@ -172,6 +234,8 @@ async def cmd_menu(message: Message):
     await message.answer("Main menu. Please select an option:", reply_markup=main_menu_kb())
 
 # ---------- навигация верхнего уровня ----------
+
+
 @dp.message(F.text == "Help")
 async def handle_help(message: Message):
     await message.answer(BOT_DESCRIPTION, reply_markup=main_menu_kb())
@@ -376,6 +440,68 @@ STATE_TO_HANDLER = {
     "reading_true_false_read_first": formulator.reading_true_false_read_first,
 }
 
+
+@dp.message(F.text == "Feedback")
+async def h_feedback(message: Message):
+    FEEDBACK_WAITING.add(message.chat.id)
+    await message.answer(
+        "We’d love to hear your thoughts!\n\n"
+        "Please type your feedback below. Send /cancel to stop."
+    )
+
+@dp.message(Command("cancel"))
+async def h_cancel(message: Message):
+    if message.chat.id in FEEDBACK_WAITING:
+        FEEDBACK_WAITING.discard(message.chat.id)
+        await message.answer("Feedback cancelled. Back to main menu.")
+
+@dp.message(lambda m: m.chat.id in FEEDBACK_WAITING)
+async def h_feedback_text(message: Message):
+    text = (message.text or "").strip()
+    if not text:
+        await message.answer("Please send text feedback or /cancel.")
+        return
+
+    # логируем как обычное действие
+    log_user_action(
+        user_id=message.from_user.id,
+        username=message.from_user.username or message.from_user.full_name,
+        action=f"FEEDBACK: {text}",
+    )
+
+    FEEDBACK_WAITING.discard(message.chat.id)
+    await message.answer("Thank you! Your feedback has been recorded 🙌")
+
+@dp.message(F.text == "Practice task formulation")
+async def h_practice(message: Message):
+    await message.answer("Currently unavailable.")
+
+# --- EXTRA QUESTIONS (должны идти ДО fallback'ов) ---
+
+# 1) Do you want to give additional instructions? -> Yes/No
+@dp.message(F.text.in_({"+", "-"}))
+async def h_additional_instructions(message: Message):
+    if formulator.get_state(message.chat.id) != "additional_instructions":
+        return  # не наш шаг — пропускаем
+    result = formulator.additional_instructions(message.chat.id, message.text)
+    await answer_with_keyboard(message, result)
+
+# 2) How do you prefer students to work? -> Individually / In pairs / In groups
+@dp.message(F.text.in_({"Individually", "In pairs", "In groups"}))
+async def h_extras_work_mode(message: Message):
+    if formulator.get_state(message.chat.id) != "extras_work_mode":
+        return
+    result = formulator.extras_work_mode(message.chat.id, message.text)
+    await answer_with_keyboard(message, result)
+
+# 3) How much time do your students have? -> 1 min / 2 mins / 3 mins
+@dp.message(F.text.in_({"1 min", "2 mins", "3 mins"}))
+async def h_extras_time(message: Message):
+    if formulator.get_state(message.chat.id) != "extras_time":
+        return
+    result = formulator.extras_time(message.chat.id, message.text)
+    await answer_with_keyboard(message, result)
+
 @dp.message()  # универсальный обработчик "шага мастера"
 async def handle_step(message: Message):
     state = formulator.get_state(message.chat.id)
@@ -396,3 +522,66 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
+
+# === helpers ===
+def _make_kb(options: list[str] | None):
+    if not options:
+        return None
+    return ReplyKeyboardMarkup(
+        keyboard=[[KeyboardButton(text=o)] for o in options],
+        resize_keyboard=True
+    )
+
+async def answer_with_keyboard(message: Message, result: dict):
+    """
+    Универсальная отправка ответа:
+    - если в result есть 'options' — рисуем клавиатуру с кнопками
+    - если action == 'done' — показываем «Back to sections / Back to main menu»
+    """
+    if not result:
+        return
+
+    # Если сценарий завершён
+    if result.get("action") == "done":
+        kb = ReplyKeyboardMarkup(
+            keyboard=[
+                [KeyboardButton(text="Back to sections")],
+                [KeyboardButton(text="Back to main menu")],
+            ],
+            resize_keyboard=True
+        )
+        await message.answer(result["text"], reply_markup=kb)
+        return
+
+    # Иначе просто шаг с вариантами
+    kb = _make_kb(result.get("options"))
+    await message.answer(result["text"], reply_markup=kb)
+
+# === helpers for extra-step replies ===
+def _make_kb(options: list[str] | None):
+    if not options:
+        return None
+    return ReplyKeyboardMarkup(
+        keyboard=[[KeyboardButton(text=o)] for o in options],
+        resize_keyboard=True
+    )
+
+async def answer_with_keyboard(message: Message, result: dict):
+    """Универсальная отправка ответа с клавиатурой."""
+    if not result:
+        return
+    # финал сценария
+    if result.get("action") == "done":
+        kb = ReplyKeyboardMarkup(
+            keyboard=[
+                [KeyboardButton(text="Back to sections")],
+                [KeyboardButton(text="Back to main menu")],
+            ],
+            resize_keyboard=True,
+        )
+        await message.answer(result["text"], reply_markup=kb)
+        return
+    # промежуточный шаг
+    kb = _make_kb(result.get("options"))
+    await message.answer(result["text"], reply_markup=kb)

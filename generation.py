@@ -11,22 +11,21 @@ class CreateTaskFormulation:
     # ---------- helpers ----------
     def reset_session(self, chat_id: int, task_type: str | None = None):
         self.sessions[chat_id] = {
-            "task_type": task_type,
-            "state": None,
-            # Сюда мы будем класть инстансы сценариев (по одному на блок)
-            "labelling": None,
-            "categorising": None,
-            "word_building": None,
-            "matching": None,
-            "odd_one_out": None,
-            "synonyms": None,
-            "grammar_mc": None,
-            "grammar_completion": None,
-            "grammar_transformation": None,
-            "grammar_error_correction": None,
-            "reading_mc": None,
-            "reading_tf": None,
-        }
+    "task_type": task_type,
+    "state": None,
+    # сценарии:
+    "labelling": None, "categorising": None, "word_building": None, "matching": None,
+    "odd_one_out": None, "synonyms": None,
+    "grammar_mc": None, "grammar_completion": None, "grammar_transformation": None,
+    "grammar_error_correction": None,
+    "reading_mc": None, "reading_tf": None,
+    # ↓↓↓ добавляем ↓↓↓
+    "pending_instruction": None,
+    "extras": {
+        "work_mode": None,   # "Individually" | "In pairs" | "In groups"
+        "time": None,        # 1 | 2 | 3
+    },
+}
 
     def _s(self, chat_id: int) -> dict:
         if chat_id not in self.sessions:
@@ -59,7 +58,71 @@ class CreateTaskFormulation:
         ):
             sess[key] = None
         return {"text": f"Task formulation:\n{instruction}", "action": "done"}
+    def _maybe_extras(self, chat_id: int, instruction: str) -> Dict[str, Any]:
+        """Универсальный пост-шаг: спрашиваем про доп. инструкции."""
+        sess = self._s(chat_id)
+        sess["pending_instruction"] = instruction
+        # обнулим ответы на случай повтора
+        sess["extras"] = {"work_mode": None, "time": None}
+        return self._ask(
+            chat_id,
+            "additional_instructions",
+            "Do you want to give additional instructions?",
+            ["+", "-"],
+        )
 
+    def additional_instructions(self, chat_id: int, text: str) -> Dict[str, Any]:
+        sess = self._s(chat_id)
+        if text == "-":
+            base = sess.get("pending_instruction") or ""
+            return self._finish(chat_id, base)
+        if text == "+":
+            return self._ask(
+                chat_id,
+                "extras_work_mode",
+                "How do you prefer students to work?",
+                ["Individually", "In pairs", "In groups"],
+            )
+        return {"text": "Please select one of the options.", "options": ["Yes", "No"]}
+
+    def extras_work_mode(self, chat_id: int, text: str) -> Dict[str, Any]:
+        sess = self._s(chat_id)
+        allowed = ["Individually", "In pairs", "In groups"]
+        if text not in allowed:
+            return {"text": "Please select one of the options.", "options": allowed}
+        sess["extras"]["work_mode"] = text
+        return self._ask(
+            chat_id,
+            "extras_time",
+            "How much time do your students have?",
+            ["1 min", "2 mins", "3 mins"],
+        )
+
+    def extras_time(self, chat_id: int, text: str) -> Dict[str, Any]:
+        sess = self._s(chat_id)
+        allowed = {"1 min": 1, "2 mins": 2, "3 mins": 3}
+        if text not in allowed:
+            return {"text": "Please select one of the options.", "options": list(allowed.keys())}
+        sess["extras"]["time"] = allowed[text]
+
+        base = (sess.get("pending_instruction") or "").rstrip()
+        work_mode = sess["extras"].get("work_mode")
+        time_min = sess["extras"].get("time")
+
+        work_map = {
+            "Individually": "Work individually.",
+            "In pairs": "Work in pairs.",
+            "In groups": "Work in groups.",
+        }
+        parts = [base]
+        if work_mode in work_map:
+            parts.append(work_map[work_mode])
+        if isinstance(time_min, int):
+            parts.append("You have 1 minute." if time_min == 1 else f"You have {time_min} minutes.")
+
+        final_text = " ".join(p.strip() for p in parts if p and p.strip())
+        return self._finish(chat_id, final_text)
+        
     # ====== ИМПОРТЫ СЦЕНАРИЕВ (как атрибуты класса) ======
     # ---------- Vocabulary: Labelling ----------
     from scenarios.vocabulary_labelling import (
@@ -206,7 +269,8 @@ class CreateTaskFormulation:
 
         sess["labelling"].set_word_list_option(opt_map[text])
         instruction = sess["labelling"].generate_instruction()
-        return self._finish(chat_id, instruction)
+        return self._maybe_extras(chat_id, instruction)
+
 
     # =======================
     #     CATEGORISING
@@ -255,7 +319,7 @@ class CreateTaskFormulation:
 
         sess["categorising"].set_table_type(type_map[text])
         instruction = sess["categorising"].generate_instruction()
-        return self._finish(chat_id, instruction)
+        return self._maybe_extras(chat_id, instruction)
 
     def categorising_table_type_other(self, chat_id: int, text: str):
         sess = self._s(chat_id)
@@ -264,7 +328,7 @@ class CreateTaskFormulation:
             return {"text": "Please enter a non-empty type."}
         sess["categorising"].set_table_type(self.TableType.OTHER, custom)
         instruction = sess["categorising"].generate_instruction()
-        return self._finish(chat_id, instruction)
+        return self._maybe_extras(chat_id, instruction)
 
     # =======================
     #    WORD-BUILDING
@@ -368,7 +432,7 @@ class CreateTaskFormulation:
 
         sess["word_building"].set_missing_type(mt_map[text])
         instruction = sess["word_building"].generate_instruction()
-        return self._finish(chat_id, instruction)
+        return self._maybe_extras(chat_id, instruction)
 
     # --- Words from letters ---
     def word_building_words_from_letters_type(self, chat_id: int, text: str):
@@ -388,7 +452,7 @@ class CreateTaskFormulation:
 
         sess["word_building"].set_word_type(wt_map[text])
         instruction = sess["word_building"].generate_instruction()
-        return self._finish(chat_id, instruction)
+        return self._maybe_extras(chat_id, instruction)
 
     def word_building_words_from_letters_type_other(self, chat_id: int, text: str):
         sess = self._s(chat_id)
@@ -397,7 +461,7 @@ class CreateTaskFormulation:
             return {"text": "Please enter a non-empty type."}
         sess["word_building"].set_word_type(self.WordType.OTHER, custom)
         instruction = sess["word_building"].generate_instruction()
-        return self._finish(chat_id, instruction)
+        return self._maybe_extras(chat_id, instruction)
 
     # --- Forms of words ---
     def word_building_forms_build_type(self, chat_id: int, text: str):
@@ -453,7 +517,7 @@ class CreateTaskFormulation:
 
         sess["word_building"].set_given_type(wt_map[text])
         instruction = sess["word_building"].generate_instruction()
-        return self._finish(chat_id, instruction)
+        return self._maybe_extras(chat_id, instruction)
 
     def word_building_forms_given_type_other(self, chat_id: int, text: str):
         sess = self._s(chat_id)
@@ -462,7 +526,7 @@ class CreateTaskFormulation:
             return {"text": "Please enter a non-empty type."}
         sess["word_building"].set_given_type(self.WordType.OTHER, custom)
         instruction = sess["word_building"].generate_instruction()
-        return self._finish(chat_id, instruction)
+        return self._maybe_extras(chat_id, instruction)
 
     # =======================
     #        MATCHING
@@ -526,7 +590,7 @@ class CreateTaskFormulation:
         sess = self._s(chat_id)
         sess["matching"].set_pictures_range((text or "").strip())
         instruction = sess["matching"].generate_instruction()
-        return self._finish(chat_id, instruction)
+        return self._maybe_extras(chat_id, instruction)
 
     # --- Descriptions to words ---
     def matching_desc_word_type(self, chat_id: int, text: str):
@@ -546,7 +610,7 @@ class CreateTaskFormulation:
 
         sess["matching"].set_desc_word_type(wt_map[text])
         instruction = sess["matching"].generate_instruction()
-        return self._finish(chat_id, instruction)
+        return self._maybe_extras(chat_id, instruction)
 
     def matching_desc_word_type_other(self, chat_id: int, text: str):
         sess = self._s(chat_id)
@@ -555,7 +619,7 @@ class CreateTaskFormulation:
             return {"text": "Please enter a non-empty type."}
         sess["matching"].set_desc_word_type(self.MatchingWordType.OTHER, custom)
         instruction = sess["matching"].generate_instruction()
-        return self._finish(chat_id, instruction)
+        return self._maybe_extras(chat_id, instruction)
 
     # --- Questions to answers ---
     def matching_questions_range(self, chat_id: int, text: str):
@@ -567,7 +631,7 @@ class CreateTaskFormulation:
         sess = self._s(chat_id)
         sess["matching"].set_answers_range((text or "").strip())
         instruction = sess["matching"].generate_instruction()
-        return self._finish(chat_id, instruction)
+        return self._maybe_extras(chat_id, instruction)
 
     # --- Matching: Other ---
     def matching_other_first(self, chat_id: int, text: str):
@@ -600,7 +664,7 @@ class CreateTaskFormulation:
 
         sess["matching"].set_other_second(wt_map[text])
         instruction = sess["matching"].generate_instruction()
-        return self._finish(chat_id, instruction)
+        return self._maybe_extras(chat_id, instruction)
 
     def matching_other_second_other(self, chat_id: int, text: str):
         sess = self._s(chat_id)
@@ -609,7 +673,7 @@ class CreateTaskFormulation:
             return {"text": "Please enter a non-empty type."}
         sess["matching"].set_other_second(self.MatchingWordType.OTHER, custom)
         instruction = sess["matching"].generate_instruction()
-        return self._finish(chat_id, instruction)
+        return self._maybe_extras(chat_id, instruction)
 
     # =======================
     #     ODD ONE OUT
@@ -671,7 +735,7 @@ class CreateTaskFormulation:
 
         sess["odd_one_out"].set_criterion(crit_map[text])
         instruction = sess["odd_one_out"].generate_instruction()
-        return self._finish(chat_id, instruction)
+        return self._maybe_extras(chat_id, instruction)
 
     def odd_one_out_criterion_other(self, chat_id: int, text: str):
         sess = self._s(chat_id)
@@ -680,7 +744,7 @@ class CreateTaskFormulation:
             return {"text": "Please enter a non-empty criterion."}
         sess["odd_one_out"].set_criterion(self.DifferenceCriterion.OTHER, custom)
         instruction = sess["odd_one_out"].generate_instruction()
-        return self._finish(chat_id, instruction)
+        return self._maybe_extras(chat_id, instruction)
 
     def odd_one_out_sound(self, chat_id: int, text: str):
         sess = self._s(chat_id)
@@ -689,7 +753,7 @@ class CreateTaskFormulation:
             return {"text": "Please enter a non-empty sound (e.g., /iz/)."}
         sess["odd_one_out"].set_sound(sound)
         instruction = sess["odd_one_out"].generate_instruction()
-        return self._finish(chat_id, instruction)
+        return self._maybe_extras(chat_id, instruction)
 
     # =======================
     #        SYNONYMS
@@ -802,7 +866,7 @@ class CreateTaskFormulation:
 
         sess["synonyms"].set_pos2(pos_map[text])
         instruction = sess["synonyms"].generate_instruction()
-        return self._finish(chat_id, instruction)
+        return self._maybe_extras(chat_id, instruction)
 
     def synonyms_pos2_other(self, chat_id: int, text: str):
         sess = self._s(chat_id)
@@ -811,7 +875,7 @@ class CreateTaskFormulation:
             return {"text": "Please enter a non-empty part of speech."}
         sess["synonyms"].set_pos2(self.PartOfSpeech.OTHER, custom)
         instruction = sess["synonyms"].generate_instruction()
-        return self._finish(chat_id, instruction)
+        return self._maybe_extras(chat_id, instruction)
 
     def synonyms_adj_type(self, chat_id: int, text: str):
         sess = self._s(chat_id)
@@ -821,7 +885,7 @@ class CreateTaskFormulation:
 
         sess["synonyms"].set_adj_type(adj_map[text])
         instruction = sess["synonyms"].generate_instruction()
-        return self._finish(chat_id, instruction)
+        return self._maybe_extras(chat_id, instruction)
 
     # =======================
     #   GRAMMAR MULTIPLE CHOICE
@@ -880,7 +944,7 @@ class CreateTaskFormulation:
 
         sess["grammar_mc"].set_subject(subj_map[text])
         instruction = sess["grammar_mc"].generate_instruction()
-        return self._finish(chat_id, instruction)
+        return self._maybe_extras(chat_id, instruction)
 
     def grammar_mc_subject_other(self, chat_id: int, subject_other: str):
         sess = self._s(chat_id)
@@ -889,7 +953,7 @@ class CreateTaskFormulation:
             return {"text": "Please enter a non-empty value."}
         sess["grammar_mc"].set_subject(self.GrammarMultipleChoiceSubject.OTHER, subject_other)
         instruction = sess["grammar_mc"].generate_instruction()
-        return self._finish(chat_id, instruction)
+        return self._maybe_extras(chat_id, instruction)
 
     # =======================
     #  GRAMMAR COMPLETION
@@ -992,7 +1056,7 @@ class CreateTaskFormulation:
         if text == "Yes":
             return self._ask(chat_id, "grammar_completion_where", "Where?", ["in brackets", "in the box", "in the list"])
         instruction = sess["grammar_completion"].generate_instruction()
-        return self._finish(chat_id, instruction)
+        return self._maybe_extras(chat_id, instruction)
 
     def grammar_completion_where(self, chat_id: int, text: str):
         sess = self._s(chat_id)
@@ -1005,7 +1069,7 @@ class CreateTaskFormulation:
             return {"text": "Please select one of the options."}
         sess["grammar_completion"].set_where(where_map[text])
         instruction = sess["grammar_completion"].generate_instruction()
-        return self._finish(chat_id, instruction)
+        return self._maybe_extras(chat_id, instruction)
 
     def grammar_completion_tense(self, chat_id: int, text: str):
         sess = self._s(chat_id)
@@ -1019,13 +1083,13 @@ class CreateTaskFormulation:
             return {"text": "Please select one of the options.", "options": allowed + ["Other"]}
         sess["grammar_completion"].set_tense(text)
         instruction = sess["grammar_completion"].generate_instruction()
-        return self._finish(chat_id, instruction)
+        return self._maybe_extras(chat_id, instruction)
 
     def grammar_completion_tense_custom(self, chat_id: int, text: str):
         sess = self._s(chat_id)
         sess["grammar_completion"].set_tense(text)
         instruction = sess["grammar_completion"].generate_instruction()
-        return self._finish(chat_id, instruction)
+        return self._maybe_extras(chat_id, instruction)
 
     def grammar_completion_tense1(self, chat_id: int, text: str):
         sess = self._s(chat_id)
@@ -1060,13 +1124,13 @@ class CreateTaskFormulation:
             return {"text": "Please select one of the options.", "options": allowed + ["Other"]}
         sess["grammar_completion"].set_tenses(sess["grammar_completion"].tense1, text)
         instruction = sess["grammar_completion"].generate_instruction()
-        return self._finish(chat_id, instruction)
+        return self._maybe_extras(chat_id, instruction)
 
     def grammar_completion_tense2_custom(self, chat_id: int, text: str):
         sess = self._s(chat_id)
         sess["grammar_completion"].set_tenses(sess["grammar_completion"].tense1, text)
         instruction = sess["grammar_completion"].generate_instruction()
-        return self._finish(chat_id, instruction)
+        return self._maybe_extras(chat_id, instruction)
 
     def grammar_completion_phrases_given(self, chat_id: int, text: str):
         sess = self._s(chat_id)
@@ -1076,7 +1140,7 @@ class CreateTaskFormulation:
         if text == "Yes":
             return self._ask(chat_id, "grammar_completion_where", "Where?", ["in brackets", "in the box", "in the list"])
         instruction = sess["grammar_completion"].generate_instruction()
-        return self._finish(chat_id, instruction)
+        return self._maybe_extras(chat_id, instruction)
 
     def grammar_completion_other_word(self, chat_id: int, text: str):
         sess = self._s(chat_id)
@@ -1094,7 +1158,7 @@ class CreateTaskFormulation:
         if text == "Yes":
             return self._ask(chat_id, "grammar_completion_where", "Where?", ["in brackets", "in the box", "in the list"])
         instruction = sess["grammar_completion"].generate_instruction()
-        return self._finish(chat_id, instruction)
+        return self._maybe_extras(chat_id, instruction)
 
     # =======================
     #  GRAMMAR TRANSFORMATION
@@ -1127,7 +1191,7 @@ class CreateTaskFormulation:
 
         if type_map[text] == self.GrammarTransformationType.OPPOSITE_ADJECTIVE:
             instruction = sess["grammar_transformation"].generate_instruction()
-            return self._finish(chat_id, instruction)
+            return self._maybe_extras(chat_id, instruction)
 
         # Change tense → спрашиваем времена
         return self._ask(
@@ -1175,13 +1239,13 @@ class CreateTaskFormulation:
 
         sess["grammar_transformation"].set_tense2(text)
         instruction = sess["grammar_transformation"].generate_instruction()
-        return self._finish(chat_id, instruction)
+        return self._maybe_extras(chat_id, instruction)
 
     def grammar_transformation_tense2_other(self, chat_id: int, text: str):
         sess = self._s(chat_id)
         sess["grammar_transformation"].set_tense2(text)
         instruction = sess["grammar_transformation"].generate_instruction()
-        return self._finish(chat_id, instruction)
+        return self._maybe_extras(chat_id, instruction)
 
     # =======================
     # GRAMMAR ERROR CORRECTION (переписано на sessions)
@@ -1243,7 +1307,7 @@ class CreateTaskFormulation:
         if text == "No":
             sess["grammar_error_correction"].set_prep_info(self.PrepInfo.NONE)
             instruction = sess["grammar_error_correction"].generate_instruction()
-            return self._finish(chat_id, instruction)
+            return self._maybe_extras(chat_id, instruction)
 
         # Yes → выбираем тип
         return self._ask(chat_id, "grammar_error_correction_prep_info_type",
@@ -1289,7 +1353,7 @@ class CreateTaskFormulation:
 
         sess["grammar_error_correction"].set_prep_info_clarify(text)
         instruction = sess["grammar_error_correction"].generate_instruction()
-        return self._finish(chat_id, instruction)
+        return self._maybe_extras(chat_id, instruction)
 
     def grammar_error_correction_prep_info_clarify_other(self, chat_id: int, text: str):
         sess = self._s(chat_id)
@@ -1298,7 +1362,7 @@ class CreateTaskFormulation:
             return {"text": "Please enter a non-empty value."}
         sess["grammar_error_correction"].set_prep_info_clarify(custom)
         instruction = sess["grammar_error_correction"].generate_instruction()
-        return self._finish(chat_id, instruction)
+        return self._maybe_extras(chat_id, instruction)
 
     # =======================
     #   READING MULTIPLE CHOICE
@@ -1334,7 +1398,7 @@ class CreateTaskFormulation:
 
         sess["reading_mc"].set_text_type(type_map[text])
         instruction = sess["reading_mc"].generate_instruction()
-        return self._finish(chat_id, instruction)
+        return self._maybe_extras(chat_id, instruction)
 
     def reading_multiple_choice_type_other(self, chat_id: int, text: str):
         sess = self._s(chat_id)
@@ -1343,7 +1407,7 @@ class CreateTaskFormulation:
             return {"text": "Please enter a non-empty type."}
         sess["reading_mc"].set_text_type(self.ReadingTextType.OTHER, custom)
         instruction = sess["reading_mc"].generate_instruction()
-        return self._finish(chat_id, instruction)
+        return self._maybe_extras(chat_id, instruction)
 
     # =======================
     #    READING TRUE/FALSE
@@ -1371,4 +1435,4 @@ class CreateTaskFormulation:
 
         sess["reading_tf"].set_read_first(text == "Yes")
         instruction = sess["reading_tf"].generate_instruction()
-        return self._finish(chat_id, instruction)
+        return self._maybe_extras(chat_id, instruction)
